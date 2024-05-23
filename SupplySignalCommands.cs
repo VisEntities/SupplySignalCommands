@@ -7,7 +7,7 @@ using System.Linq;
 namespace Oxide.Plugins
 {
     [Info("Supply Signal Commands", "VisEntities", "1.0.0")]
-    [Description("Run chat, client, and server commands when a supply signal is thrown.")]
+    [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
         #region Fields
