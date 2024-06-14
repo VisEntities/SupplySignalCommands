@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.0.0")]
+    [Info("Supply Signal Commands", "VisEntities", "1.1.0")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -30,13 +30,16 @@ namespace Oxide.Plugins
 
         private class SupplySignalConfig
         {
+            [JsonProperty("Display Name")]
+            public string DisplayName { get; set; }
+
             [JsonProperty("Skin Id")]
             public ulong SkinId { get; set; }
 
             [JsonProperty("Should Explode")]
             public bool ShouldExplode { get; set; }
 
-            [JsonProperty("CommandsToRun")]
+            [JsonProperty("Commands To Run")]
             public List<CommandConfig> CommandsToRun { get; set; }
         }
 
@@ -80,6 +83,14 @@ namespace Oxide.Plugins
             if (string.Compare(_config.Version, "1.0.0") < 0)
                 _config = defaultConfig;
 
+            if (string.Compare(_config.Version, "1.1.0") < 0)
+            {
+                foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
+                {
+                    supplySignal.DisplayName = "Supply Signal";
+                }
+            }
+
             PrintWarning("Config update complete! Updated from version " + _config.Version + " to " + Version.ToString());
             _config.Version = Version.ToString();
         }
@@ -93,6 +104,7 @@ namespace Oxide.Plugins
                 {
                     new SupplySignalConfig
                     {
+                        DisplayName = "Supply Signal",
                         SkinId = 0,
                         ShouldExplode = false,
                         CommandsToRun = new List<CommandConfig>
@@ -143,7 +155,8 @@ namespace Oxide.Plugins
                 return;
 
             ulong skinId = item.skin;
-            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c => c.SkinId == skinId);
+            string name = item.name;
+            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c => c.SkinId == skinId && c.DisplayName == name);
             if (supplySignalConfig != null)
             {
                 if (!supplySignalConfig.ShouldExplode)
