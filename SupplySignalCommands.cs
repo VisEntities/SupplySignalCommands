@@ -1,4 +1,10 @@
-﻿using Network;
+﻿/*
+ * Copyright (C) 2024 Game4Freak.io
+ * This mod is provided under the Game4Freak EULA.
+ * Full legal terms can be found at https://game4freak.io/eula/
+ */
+
+using Network;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.Collections.Generic;
@@ -6,7 +12,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.1.0")]
+    [Info("Supply Signal Commands", "VisEntities", "1.1.1")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -30,11 +36,11 @@ namespace Oxide.Plugins
 
         private class SupplySignalConfig
         {
-            [JsonProperty("Display Name")]
-            public string DisplayName { get; set; }
+            [JsonProperty("Item Name")]
+            public string ItemName { get; set; }
 
-            [JsonProperty("Skin Id")]
-            public ulong SkinId { get; set; }
+            [JsonProperty("Item Skin Id")]
+            public ulong ItemSkinId { get; set; }
 
             [JsonProperty("Should Explode")]
             public bool ShouldExplode { get; set; }
@@ -87,7 +93,16 @@ namespace Oxide.Plugins
             {
                 foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
                 {
-                    supplySignal.DisplayName = "Supply Signal";
+                    supplySignal.ItemName = "";
+                }
+            }
+
+            if (string.Compare(_config.Version, "1.1.1") < 0)
+            {
+                foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
+                {
+                    supplySignal.ItemName = "";
+                    supplySignal.ItemSkinId = 0;
                 }
             }
 
@@ -104,8 +119,8 @@ namespace Oxide.Plugins
                 {
                     new SupplySignalConfig
                     {
-                        DisplayName = "Supply Signal",
-                        SkinId = 0,
+                        ItemName = "",
+                        ItemSkinId = 0,
                         ShouldExplode = false,
                         CommandsToRun = new List<CommandConfig>
                         {
@@ -156,7 +171,8 @@ namespace Oxide.Plugins
 
             ulong skinId = item.skin;
             string name = item.name;
-            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c => c.SkinId == skinId && c.DisplayName == name);
+
+            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c => c.ItemSkinId == skinId && (string.IsNullOrEmpty(c.ItemName) || c.ItemName == name));
             if (supplySignalConfig != null)
             {
                 if (!supplySignalConfig.ShouldExplode)
