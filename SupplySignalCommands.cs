@@ -150,7 +150,7 @@ namespace Oxide.Plugins
                             new CommandConfig
                             {
                                 Type = CommandType.Chat,
-                                Command = "Hello, my name is {PlayerName} and you can find me in grid {Grid}."
+                                Command = "Hello, my name is {playerName} and you can find me in grid {grid}."
                             },
                             new CommandConfig
                             {
@@ -160,10 +160,10 @@ namespace Oxide.Plugins
                             new CommandConfig
                             {
                                 Type = CommandType.Server,
-                                Command = "inventory.giveto {PlayerId} scrap 50"
+                                Command = "inventory.giveto {playerId} scrap 50"
                             }
                         },
-                        MessageSentToPlayer = "You just threw a supply signal at {Grid}. Get ready for the airdrop!"
+                        MessageSentToPlayer = "You just threw a supply signal at {grid}. Get ready for the airdrop!"
                     }
                 }
             };
@@ -255,12 +255,12 @@ namespace Oxide.Plugins
         private void RunCommand(BasePlayer player, CommandType type, string command)
         {
             string withPlaceholdersReplaced = command
-                .Replace("{PlayerId}", player.UserIDString)
-                .Replace("{PlayerName}", player.displayName)
-                .Replace("{PositionX}", player.transform.position.x.ToString())
-                .Replace("{PositionY}", player.transform.position.y.ToString())
-                .Replace("{PositionZ}", player.transform.position.z.ToString())
-                .Replace("{Grid}", PhoneController.PositionToGridCoord(player.transform.position));
+                .Replace("{playerId}", player.UserIDString)
+                .Replace("{playerName}", player.displayName)
+                .Replace("{positionX}", player.transform.position.x.ToString())
+                .Replace("{positionY}", player.transform.position.y.ToString())
+                .Replace("{positionZ}", player.transform.position.z.ToString())
+                .Replace("{grid}", PhoneController.PositionToGridCoord(player.transform.position));
 
             if (type == CommandType.Chat)
             {
