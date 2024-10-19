@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.2.0")]
+    [Info("Supply Signal Commands", "VisEntities", "1.3.0")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -44,6 +44,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Should Explode")]
             public bool ShouldExplode { get; set; }
+
+            [JsonProperty("Run Random Command ")]
+            public bool RunRandomCommand { get; set; }
 
             [JsonProperty("Commands To Run")]
             public List<CommandConfig> CommandsToRun { get; set; }
@@ -117,6 +120,14 @@ namespace Oxide.Plugins
                 }
             }
 
+            if (string.Compare(_config.Version, "1.3.0") < 0)
+            {
+                foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
+                {
+                    supplySignal.RunRandomCommand = false;
+                }
+            }
+
             PrintWarning("Config update complete! Updated from version " + _config.Version + " to " + Version.ToString());
             _config.Version = Version.ToString();
         }
@@ -133,12 +144,13 @@ namespace Oxide.Plugins
                         ItemName = "",
                         ItemSkinId = 0,
                         ShouldExplode = false,
+                        RunRandomCommand = false,
                         CommandsToRun = new List<CommandConfig>
                         {
                             new CommandConfig
                             {
                                 Type = CommandType.Chat,
-                                Command = "Hello, my name is {playerName} and you can find me in grid {grid}."
+                                Command = "Hello, my name is {PlayerName} and you can find me in grid {Grid}."
                             },
                             new CommandConfig
                             {
@@ -148,10 +160,10 @@ namespace Oxide.Plugins
                             new CommandConfig
                             {
                                 Type = CommandType.Server,
-                                Command = "inventory.giveto {playerId} scrap 50"
+                                Command = "inventory.giveto {PlayerId} scrap 50"
                             }
                         },
-                        MessageSentToPlayer = "You just threw a supply signal at {grid}. Get ready for the airdrop!"
+                        MessageSentToPlayer = "You just threw a supply signal at {Grid}. Get ready for the airdrop!"
                     }
                 }
             };
@@ -192,9 +204,17 @@ namespace Oxide.Plugins
                     supplySignal.CancelInvoke(supplySignal.Explode);
                 }
 
-                foreach (var commandConfig in supplySignalConfig.CommandsToRun)
+                if (supplySignalConfig.RunRandomCommand && supplySignalConfig.CommandsToRun.Any())
                 {
-                    RunCommand(player, commandConfig.Type, commandConfig.Command);
+                    CommandConfig randomCommand = supplySignalConfig.CommandsToRun.GetRandom();
+                    RunCommand(player, randomCommand.Type, randomCommand.Command);
+                }
+                else
+                {
+                    foreach (CommandConfig commandConfig in supplySignalConfig.CommandsToRun)
+                    {
+                        RunCommand(player, commandConfig.Type, commandConfig.Command);
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(supplySignalConfig.MessageSentToPlayer))
@@ -235,12 +255,12 @@ namespace Oxide.Plugins
         private void RunCommand(BasePlayer player, CommandType type, string command)
         {
             string withPlaceholdersReplaced = command
-                .Replace("{playerId}", player.UserIDString)
-                .Replace("{playerName}", player.displayName)
-                .Replace("{positionX}", player.transform.position.x.ToString())
-                .Replace("{positionY}", player.transform.position.y.ToString())
-                .Replace("{positionZ}", player.transform.position.z.ToString())
-                .Replace("{grid}", PhoneController.PositionToGridCoord(player.transform.position));
+                .Replace("{PlayerId}", player.UserIDString)
+                .Replace("{PlayerName}", player.displayName)
+                .Replace("{PositionX}", player.transform.position.x.ToString())
+                .Replace("{PositionY}", player.transform.position.y.ToString())
+                .Replace("{PositionZ}", player.transform.position.z.ToString())
+                .Replace("{Grid}", PhoneController.PositionToGridCoord(player.transform.position));
 
             if (type == CommandType.Chat)
             {
