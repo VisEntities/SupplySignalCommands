@@ -139,7 +139,7 @@ namespace Oxide.Plugins
                             new CommandConfig
                             {
                                 Type = CommandType.Chat,
-                                Command = "Hello, my name is {playerName} and you can find me in grid {grid}."
+                                Command = "Hello, my name is {PlayerName} and you can find me in grid {Grid}."
                             },
                             new CommandConfig
                             {
@@ -149,7 +149,7 @@ namespace Oxide.Plugins
                             new CommandConfig
                             {
                                 Type = CommandType.Server,
-                                Command = "inventory.giveto {playerId} scrap 50"
+                                Command = "inventory.giveto {PlayerId} scrap 50"
                             }
                         },
                     }
