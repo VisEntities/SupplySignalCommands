@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.3.0")]
+    [Info("Supply Signal Commands", "VisEntities", "1.3.1")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -50,9 +50,6 @@ namespace Oxide.Plugins
 
             [JsonProperty("Commands To Run")]
             public List<CommandConfig> CommandsToRun { get; set; }
-
-            [JsonProperty("Message Sent To Player")]
-            public string MessageSentToPlayer { get; set; }
         }
 
         private class CommandConfig
@@ -112,14 +109,6 @@ namespace Oxide.Plugins
                 }
             }
 
-            if (string.Compare(_config.Version, "1.2.0") < 0)
-            {
-                foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
-                {
-                    supplySignal.MessageSentToPlayer = "You just threw a supply signal at {grid}. Get ready for the airdrop!";
-                }
-            }
-
             if (string.Compare(_config.Version, "1.3.0") < 0)
             {
                 foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
@@ -163,7 +152,6 @@ namespace Oxide.Plugins
                                 Command = "inventory.giveto {playerId} scrap 50"
                             }
                         },
-                        MessageSentToPlayer = "You just threw a supply signal at {grid}. Get ready for the airdrop!"
                     }
                 }
             };
@@ -216,32 +204,10 @@ namespace Oxide.Plugins
                         RunCommand(player, commandConfig.Type, commandConfig.Command);
                     }
                 }
-
-                if (!string.IsNullOrEmpty(supplySignalConfig.MessageSentToPlayer))
-                {
-                    SendFormattedMessage(player, supplySignalConfig.MessageSentToPlayer);
-                }
             }
         }
 
         #endregion Oxide Hooks
-
-        #region Message Formatting
-
-        private void SendFormattedMessage(BasePlayer player, string message)
-        {
-            string withPlaceholdersReplaced = message
-                .Replace("{playerId}", player.UserIDString)
-                .Replace("{playerName}", player.displayName)
-                .Replace("{positionX}", player.transform.position.x.ToString())
-                .Replace("{positionY}", player.transform.position.y.ToString())
-                .Replace("{positionZ}", player.transform.position.z.ToString())
-                .Replace("{grid}", PhoneController.PositionToGridCoord(player.transform.position));
-
-            SendReply(player, withPlaceholdersReplaced);
-        }
-
-        #endregion Message Formatting
 
         #region Command Execution
 
@@ -255,12 +221,12 @@ namespace Oxide.Plugins
         private void RunCommand(BasePlayer player, CommandType type, string command)
         {
             string withPlaceholdersReplaced = command
-                .Replace("{playerId}", player.UserIDString)
-                .Replace("{playerName}", player.displayName)
-                .Replace("{positionX}", player.transform.position.x.ToString())
-                .Replace("{positionY}", player.transform.position.y.ToString())
-                .Replace("{positionZ}", player.transform.position.z.ToString())
-                .Replace("{grid}", PhoneController.PositionToGridCoord(player.transform.position));
+                .Replace("{PlayerId}", player.UserIDString)
+                .Replace("{PlayerName}", player.displayName)
+                .Replace("{PositionX}", player.transform.position.x.ToString())
+                .Replace("{PositionY}", player.transform.position.y.ToString())
+                .Replace("{PositionZ}", player.transform.position.z.ToString())
+                .Replace("{Grid}", PhoneController.PositionToGridCoord(player.transform.position));
 
             if (type == CommandType.Chat)
             {
