@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.3.1")]
+    [Info("Supply Signal Commands", "VisEntities", "1.3.2")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -226,7 +226,7 @@ namespace Oxide.Plugins
                 .Replace("{PositionX}", player.transform.position.x.ToString())
                 .Replace("{PositionY}", player.transform.position.y.ToString())
                 .Replace("{PositionZ}", player.transform.position.z.ToString())
-                .Replace("{Grid}", PhoneController.PositionToGridCoord(player.transform.position));
+                .Replace("{Grid}", MapHelper.PositionToString(player.transform.position));
 
             if (type == CommandType.Chat)
             {
