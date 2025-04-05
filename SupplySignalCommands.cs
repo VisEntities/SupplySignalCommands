@@ -7,12 +7,14 @@
 using Network;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.3.2")]
+    [Info("Supply Signal Commands", "VisEntities", "1.4.0")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -20,6 +22,7 @@ namespace Oxide.Plugins
 
         private static SupplySignalCommands _plugin;
         private static Configuration _config;
+        private Dictionary<ulong, Dictionary<int, double>> _lastUseTimes = new Dictionary<ulong, Dictionary<int, double>>();
 
         #endregion Fields
 
@@ -36,20 +39,29 @@ namespace Oxide.Plugins
 
         private class SupplySignalConfig
         {
-            [JsonProperty("Item Name")]
-            public string ItemName { get; set; }
+            [JsonProperty("Supply Signal Display Name")]
+            public string DisplayName { get; set; }
 
-            [JsonProperty("Item Skin Id")]
-            public ulong ItemSkinId { get; set; }
+            [JsonProperty("Supply Signal Skin Id")]
+            public ulong SupplySignalSkinId { get; set; }
 
             [JsonProperty("Should Explode")]
             public bool ShouldExplode { get; set; }
+
+            [JsonProperty("Cooldown Seconds")]
+            public float CooldownSeconds { get; set; }
 
             [JsonProperty("Run Random Command ")]
             public bool RunRandomCommand { get; set; }
 
             [JsonProperty("Commands To Run")]
             public List<CommandConfig> CommandsToRun { get; set; }
+
+            [JsonProperty("Global Message (Sent to Everyone)")]
+            public string GlobalMessage { get; set; }
+
+            [JsonProperty("Personal Message (Sent to Thrower)")]
+            public string PersonalMessage { get; set; }
         }
 
         private class CommandConfig
@@ -96,7 +108,7 @@ namespace Oxide.Plugins
             {
                 foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
                 {
-                    supplySignal.ItemName = "";
+                    supplySignal.DisplayName = "";
                 }
             }
 
@@ -104,8 +116,8 @@ namespace Oxide.Plugins
             {
                 foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
                 {
-                    supplySignal.ItemName = "";
-                    supplySignal.ItemSkinId = 0;
+                    supplySignal.DisplayName = "";
+                    supplySignal.SupplySignalSkinId = 0;
                 }
             }
 
@@ -114,6 +126,18 @@ namespace Oxide.Plugins
                 foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
                 {
                     supplySignal.RunRandomCommand = false;
+                }
+            }
+
+            if (string.Compare(_config.Version, "1.4.0") < 0)
+            {
+                foreach (SupplySignalConfig supplySignal in _config.SupplySignals)
+                {
+                    supplySignal.DisplayName = "";
+                    supplySignal.SupplySignalSkinId = 0;
+                    supplySignal.CooldownSeconds = 60f;
+                    supplySignal.GlobalMessage = "";
+                    supplySignal.PersonalMessage = "You triggered a special supply signal, {PlayerName}!";
                 }
             }
 
@@ -130,9 +154,10 @@ namespace Oxide.Plugins
                 {
                     new SupplySignalConfig
                     {
-                        ItemName = "",
-                        ItemSkinId = 0,
+                        DisplayName = "",
+                        SupplySignalSkinId = 0,
                         ShouldExplode = false,
+                        CooldownSeconds = 60f,
                         RunRandomCommand = false,
                         CommandsToRun = new List<CommandConfig>
                         {
@@ -152,6 +177,8 @@ namespace Oxide.Plugins
                                 Command = "inventory.giveto {PlayerId} scrap 50"
                             }
                         },
+                        GlobalMessage = "",
+                        PersonalMessage = "You triggered a special supply signal, {PlayerName}!"
                     }
                 }
             };
@@ -184,9 +211,32 @@ namespace Oxide.Plugins
             ulong skinId = item.skin;
             string name = item.name;
 
-            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c => c.ItemSkinId == skinId && (string.IsNullOrEmpty(c.ItemName) || c.ItemName == name));
+            SupplySignalConfig supplySignalConfig = _config.SupplySignals.FirstOrDefault(c =>
+                c.SupplySignalSkinId == skinId
+                && (string.IsNullOrEmpty(c.DisplayName) || c.DisplayName == name)
+            );
+
             if (supplySignalConfig != null)
             {
+                if (supplySignalConfig.CooldownSeconds > 0)
+                {
+                    int configIndex = _config.SupplySignals.IndexOf(supplySignalConfig);
+
+                    if (OnCooldown(player, configIndex, supplySignalConfig.CooldownSeconds, out double remain))
+                    {
+                        string nicelyFormatted = FormatTime(remain);
+                        MessagePlayer(player, Lang.OnCooldown, nicelyFormatted);
+                        return;
+                    }
+
+                    if (!_lastUseTimes.TryGetValue(player.userID, out var dict))
+                    {
+                        dict = new Dictionary<int, double>();
+                        _lastUseTimes[player.userID] = dict;
+                    }
+                    dict[configIndex] = Time.realtimeSinceStartup;
+                }
+
                 if (!supplySignalConfig.ShouldExplode)
                 {
                     supplySignal.CancelInvoke(supplySignal.Explode);
@@ -204,10 +254,65 @@ namespace Oxide.Plugins
                         RunCommand(player, commandConfig.Type, commandConfig.Command);
                     }
                 }
+
+                if (!string.IsNullOrEmpty(supplySignalConfig.GlobalMessage))
+                {
+                    string globalMsg = ReplacePlaceholders(supplySignalConfig.GlobalMessage, player);
+                    foreach (var activePlayer in BasePlayer.activePlayerList)
+                    {
+                        MessagePlayer(activePlayer, globalMsg);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(supplySignalConfig.PersonalMessage))
+                {
+                    string personalMsg = ReplacePlaceholders(supplySignalConfig.PersonalMessage, player);
+                    MessagePlayer(player, personalMsg);
+                }
             }
         }
 
         #endregion Oxide Hooks
+
+        #region Helper Functions
+
+        private bool OnCooldown(BasePlayer player, int configIndex, float cooldownSeconds, out double timeRemaining)
+        { 
+            timeRemaining = 0;
+            if (!_lastUseTimes.TryGetValue(player.userID, out var dict))
+                return false;
+
+            if (!dict.TryGetValue(configIndex, out double lastUse))
+                return false;
+
+            double now = Time.realtimeSinceStartup;
+            double nextAvail = lastUse + cooldownSeconds;
+            if (now < nextAvail)
+            {
+                timeRemaining = nextAvail - now;
+                return true;
+            }
+            return false;
+        }
+
+        private string FormatTime(double seconds)
+        {
+            TimeSpan ts = TimeSpan.FromSeconds(seconds);
+            if (ts.TotalHours >= 1)
+            {
+                return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+            }
+            else if (ts.TotalMinutes >= 1)
+            {
+                return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+            }
+            else
+            {
+                return $"{(int)ts.TotalSeconds}s";
+            }
+        }
+
+        #endregion Helper Functions
 
         #region Command Execution
 
@@ -220,28 +325,70 @@ namespace Oxide.Plugins
 
         private void RunCommand(BasePlayer player, CommandType type, string command)
         {
-            string withPlaceholdersReplaced = command
-                .Replace("{PlayerId}", player.UserIDString)
-                .Replace("{PlayerName}", player.displayName)
-                .Replace("{PositionX}", player.transform.position.x.ToString())
-                .Replace("{PositionY}", player.transform.position.y.ToString())
-                .Replace("{PositionZ}", player.transform.position.z.ToString())
-                .Replace("{Grid}", MapHelper.PositionToString(player.transform.position));
+            string result = ReplacePlaceholders(command, player);
 
-            if (type == CommandType.Chat)
+            switch (type)
             {
-                player.Command(string.Format("chat.say \"{0}\"", withPlaceholdersReplaced));
-            }
-            else if (type == CommandType.Client)
-            {
-                player.Command(withPlaceholdersReplaced);
-            }
-            else if (type == CommandType.Server)
-            {
-                Server.Command(withPlaceholdersReplaced);
+                case CommandType.Chat:
+                    player.Command($"chat.say \"{result}\"");
+                    break;
+                case CommandType.Client:
+                    player.Command(result);
+                    break;
+                case CommandType.Server:
+                    Server.Command(result);
+                    break;
             }
         }
 
         #endregion Command Execution
+
+        #region Placeholder Replacement
+
+        private string ReplacePlaceholders(string text, BasePlayer player)
+        {
+            return text
+                .Replace("{PlayerId}", player.UserIDString)
+                .Replace("{PlayerName}", player.displayName)
+                .Replace("{PositionX}", player.transform.position.x.ToString("F1"))
+                .Replace("{PositionY}", player.transform.position.y.ToString("F1"))
+                .Replace("{PositionZ}", player.transform.position.z.ToString("F1"))
+                .Replace("{Grid}", MapHelper.PositionToString(player.transform.position));
+        }
+
+        #endregion Placeholder Replacement
+
+        #region Localization
+
+        private class Lang
+        {
+            public const string OnCooldown = "OnCooldown";
+        }
+
+        protected override void LoadDefaultMessages()
+        {
+            lang.RegisterMessages(new Dictionary<string, string>
+            {
+                [Lang.OnCooldown] = "You must wait {0} before the commands on this supply signal can be triggered again!",
+
+            }, this, "en");
+        }
+
+        private static string GetMessage(BasePlayer player, string messageKey, params object[] args)
+        {
+            string message = _plugin.lang.GetMessage(messageKey, _plugin, player.UserIDString);
+            if (args.Length > 0)
+                message = string.Format(message, args);
+
+            return message;
+        }
+
+        public static void MessagePlayer(BasePlayer player, string messageKey, params object[] args)
+        {
+            string message = GetMessage(player, messageKey, args);
+            _plugin.SendReply(player, message);
+        }
+
+        #endregion Localization
     }
 }
