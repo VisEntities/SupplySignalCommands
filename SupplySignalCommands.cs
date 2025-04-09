@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Supply Signal Commands", "VisEntities", "1.4.0")]
+    [Info("Supply Signal Commands", "VisEntities", "1.5.0")]
     [Description("Run commands when a supply signal is thrown.")]
     public class SupplySignalCommands : RustPlugin
     {
@@ -226,6 +226,11 @@ namespace Oxide.Plugins
                     {
                         string nicelyFormatted = FormatTime(remain);
                         MessagePlayer(player, Lang.OnCooldown, nicelyFormatted);
+
+                        RefundSupplySignal(player, supplySignalConfig);
+                        supplySignal.CancelInvoke(supplySignal.Explode);
+                        supplySignal.Kill();
+
                         return;
                     }
 
@@ -358,11 +363,32 @@ namespace Oxide.Plugins
 
         #endregion Placeholder Replacement
 
+        #region Refund
+
+        private void RefundSupplySignal(BasePlayer player, SupplySignalConfig supplySignalConfig)
+        {
+            if (player == null || supplySignalConfig == null)
+                return;
+
+            Item newSignal = ItemManager.CreateByName("supply.signal", 1, supplySignalConfig.SupplySignalSkinId);
+            if (newSignal != null)
+            {
+                if (!string.IsNullOrEmpty(supplySignalConfig.DisplayName))
+                    newSignal.name = supplySignalConfig.DisplayName;
+
+                player.GiveItem(newSignal);
+                MessagePlayer(player, Lang.RefundSignal);
+            }
+        }
+
+        #endregion Refund
+
         #region Localization
 
         private class Lang
         {
             public const string OnCooldown = "OnCooldown";
+            public const string RefundSignal = "RefundSignal";
         }
 
         protected override void LoadDefaultMessages()
@@ -370,6 +396,7 @@ namespace Oxide.Plugins
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 [Lang.OnCooldown] = "You must wait {0} before the commands on this supply signal can be triggered again!",
+                [Lang.RefundSignal] = "Supply signal refunded because you are on cooldown."
 
             }, this, "en");
         }
